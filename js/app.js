@@ -57,6 +57,24 @@
     return message ? url + '?text=' + encodeURIComponent(message) : url;
   }
 
+  // Google Drive share links ("…/file/d/<id>/view?usp=sharing") open a viewer page,
+  // not the image, so turn them into Google's direct image address, asking for
+  // WebP ("-rw") at the width the page needs ("=w800"). Other links pass through.
+  function imageUrl(link, width) {
+    link = String(link || '').trim();
+    if (!/^https?:\/\/(drive|docs)\.google\.com\//.test(link)) return link;
+    var m = link.match(/\/d\/([\w-]{10,})/) || link.match(/[?&]id=([\w-]{10,})/);
+    if (!m) return link;
+    return 'https://lh3.googleusercontent.com/d/' + m[1] + '=' + (width ? 'w' + width : 's0') + '-rw';
+  }
+
+  function setImageSrc(img, link, width) {
+    var url = imageUrl(link, width);
+    // Google's image servers can refuse requests that carry another site's address.
+    if (/googleusercontent\.com\//.test(url)) img.referrerPolicy = 'no-referrer';
+    img.src = url;
+  }
+
   // Shows the photo, or a labelled placeholder box when there is no photo
   // (or the link is broken).
   function renderMedia(container, src, alt, opts) {
@@ -67,7 +85,6 @@
     var node;
     if (src) {
       node = document.createElement('img');
-      node.src = src;
       node.alt = alt || '';
       node.width = opts.width || 800;
       node.height = opts.height || 1000;
@@ -77,6 +94,7 @@
       node.addEventListener('error', function () {
         renderMedia(container, '', alt, opts);
       }, { once: true });
+      setImageSrc(node, src, opts.fetchWidth || node.width);
     } else {
       node = document.createElement('div');
       node.className = 'placeholder';
@@ -106,9 +124,23 @@
     });
 
     $all('img[data-src]').forEach(function (img) {
-      img.src = get(img.getAttribute('data-src')) || '';
+      var link = get(img.getAttribute('data-src'));
+      if (!link) { img.remove(); return; }
       img.alt = get(img.getAttribute('data-alt')) || '';
+      setImageSrc(img, link);
     });
+
+    // Browser-tab and home-screen icon.
+    var icon = get('business.favicon') || get('business.logo');
+    if (icon) {
+      ['icon', 'apple-touch-icon'].forEach(function (rel) {
+        var link = document.createElement('link');
+        link.rel = rel;
+        link.href = imageUrl(icon).replace(/-rw$/, ''); // keep the original PNG: safest for tab icons
+        link.referrerPolicy = 'no-referrer';
+        document.head.appendChild(link);
+      });
+    }
 
     $all('[data-whatsapp]').forEach(function (a) {
       var key = a.getAttribute('data-whatsapp');
@@ -149,8 +181,8 @@
       $('.testimonial .quote').textContent = '“' + t.quote + '”';
     }
 
-    if (C.custom) renderMedia($('[data-media="custom"]'), C.custom.image, C.custom.imageAlt, { width: 1200, height: 1000 });
-    if (C.about && $('[data-media="about"]')) renderMedia($('[data-media="about"]'), C.about.image, C.about.imageAlt, { width: 1000, height: 1000 });
+    if (C.custom) renderMedia($('[data-media="custom"]'), C.custom.image, C.custom.imageAlt, { width: 1200, height: 1000, fetchWidth: 1600 });
+    if (C.about && $('[data-media="about"]')) renderMedia($('[data-media="about"]'), C.about.image, C.about.imageAlt, { width: 1000, height: 1000, fetchWidth: 1200 });
   }
 
   // ---------- lists ----------
@@ -197,16 +229,13 @@
     if (!socialList.children.length) socialList.remove();
 
     var hero = $('[data-list="heroProducts"]');
-    ((C.hero && C.hero.featuredProductIds) || []).forEach(function (id) {
-      var p = productById[id];
-      if (!p) return;
+    ((C.hero && C.hero.photos) || []).forEach(function (photo) {
       var li = fromTemplate('tpl-hero-product');
       var a = $('.hero-product-link', li);
-      a.href = '#product-' + p.id;
-      a.setAttribute('aria-label', p.name + ', ' + priceText(p));
-      renderMedia($('.media', li), p.image, p.imageAlt, { eager: true });
-      $('.name', li).textContent = p.name;
-      $('.price', li).textContent = money.format(p.price);
+      a.href = photo.link || '#shop';
+      renderMedia($('.media', li), photo.image, photo.imageAlt, { eager: true });
+      $('.name', li).textContent = photo.caption || '';
+      $('.note', li).textContent = photo.note || '';
       hero.appendChild(li);
     });
     if (!hero.children.length) hero.remove();

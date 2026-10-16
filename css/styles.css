@@ -422,13 +422,13 @@ main:focus, section:focus { outline: none; }
 .hero-product-link { display: flex; flex-direction: column; gap: 10px; }
 .hero-product-meta {
   display: flex;
-  justify-content: space-between;
-  gap: 8px;
+  flex-direction: column;
+  gap: 2px;
   font-size: 14px;
   line-height: 1.35;
 }
 .hero-product-meta .name { min-width: 0; text-wrap: balance; }
-.hero-product-meta .price { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.hero-product-meta .note { white-space: nowrap; color: var(--ink-soft); }
 @media (hover: hover) {
   .hero-product-link:hover .name { text-decoration: underline; text-underline-offset: 4px; }
 }
@@ -449,7 +449,7 @@ main:focus, section:focus { outline: none; }
   .hero-copy .lede { max-width: 440px; }
   .hero-products { gap: 16px; }
   .hero-product:nth-child(2) { margin-top: 48px; }
-  .hero-product-meta { font-size: 15px; }
+  .hero-product-meta { flex-direction: row; justify-content: space-between; gap: 8px; font-size: 15px; }
 }
 
 /* ---------- Shop ---------- */
